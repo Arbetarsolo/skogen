@@ -100,7 +100,7 @@
 
             // PROVA DENNA ROTATION: 
             // Om den fortfarande ser fel ut, ändra 0 till Math.PI eller tvärtom
-            model.rotation.y = 0; 
+            model.rotation.y = Math.PI; 
 
             model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
             playerGroup.add(model);
