@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <title>Avatar Skogsäventyr - GLB Version</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        #instructions {
+            position: absolute; top: 10px; left: 10px;
+            color: white; background: rgba(0,0,0,0.6);
+            padding: 15px; font-family: sans-serif; border-radius: 5px;
+        }
+        #loading {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: cyan; font-family: sans-serif; font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Laddar din Avatar...</div>
+    <div id="instructions">
+        <b>KONTROLLER:</b><br>
+        W/A/S/D - Gå<br>
+        Mus - Titta runt (Klicka på skärmen för att låsa musen)
+    </div>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        // --- SCENINSTÄLLNINGAR ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x02040a); // Mörk, mystisk skogshimmel
+        scene.fog = new THREE.FogExp2(0x02040a, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // Aktivera skuggor
+        document.body.appendChild(renderer.domElement);
+
+        // --- LJUS (Avatar-stil) ---
+        const ambientLight = new THREE.AmbientLight(0x4040ff, 0.5); // Blåaktigt nattljus
+        scene.add(ambientLight);
+
+        const spotLight = new THREE.SpotLight(0xffffff, 100);
+        spotLight.position.set(10, 20, 10);
+        spotLight.castShadow = true;
+        scene.add(spotLight);
+
+        // --- MARKEN ---
+        const groundGeo = new THREE.PlaneGeometry(200, 200);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x051a05 });
+        const ground = new THREE.Mesh(groundGeo, groundMat);
+        ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // --- SKAPA SKOG (Självlysande träd) ---
+        for(let i = 0; i < 100; i++) {
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.4, 5), 
+                new THREE.MeshStandardMaterial({color: 0x1a0f00})
+            );
+            const leaves = new THREE.Mesh(
+                new THREE.DodecahedronGeometry(2), 
+                new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x004422})
+            );
+            leaves.position.y = 3;
+            const tree = new THREE.Group();
+            tree.add(trunk, leaves);
+            tree.position.set(Math.random()*150-75, 2.5, Math.random()*150-75);
+            scene.add(tree);
+        }
+
+        // --- LADDA DIN GLB-MODELL ---
+        let player = new THREE.Group(); // Behållare för karaktären
+        const loader = new GLTFLoader();
+        
+        // ERSÄTT 'gifts_of_akatosh_armor.glb' med den faktiska sökvägen om den ändras
+        loader.load(https://drive.google.com/file/d/1DTTrWLVmZLK9ijCfrkstW2-xNhnXBcOv/view?usp=sharing, function(gltf) {
+            const model = gltf.scene;
+            model.scale.set(1, 1, 1); // Justera storleken om den är för liten/stor
+            model.traverse(n => { if (n.isMesh) n.castShadow = true; });
+            
+            player.add(model);
+            scene.add(player);
+            document.getElementById('loading').style.display = 'none';
+        }, undefined, function(error) {
+            console.error("Kunde inte ladda modellen:", error);
+            // Om filen inte hittas, använd en nödlösning (blå kub)
+            const fallback = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x00aaff}));
+            player.add(fallback);
+            scene.add(player);
+            document.getElementById('loading').innerText = "Kunde inte hitta GLB-filen, visar platshållare.";
+        });
+
+        // --- RÖRELSE ---
+        const keys = {};
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        function update() {
+            const moveSpeed = 0.15;
+            if (keys['KeyW']) player.translateZ(-moveSpeed);
+            if (keys['KeyS']) player.translateZ(moveSpeed);
+            if (keys['KeyA']) player.rotation.y += 0.05;
+            if (keys['KeyD']) player.rotation.y -= 0.05;
+
+            // Kameran följer spelaren bakifrån (Third Person)
+            const relativeCameraOffset = new THREE.Vector3(0, 5, 10);
+            const cameraOffset = relativeCameraOffset.applyMatrix4(player.matrixWorld);
+            camera.position.x = cameraOffset.x;
+            camera.position.y = cameraOffset.y;
+            camera.position.z = cameraOffset.z;
+            camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
