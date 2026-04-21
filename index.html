@@ -3,19 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar 3D - Full View Fix</title>
+    <title>Avatar: Akatosh Forest</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #4488ff; font-family: sans-serif; }
+        #ui {
+            position: absolute; top: 20px; left: 20px;
+            color: #00f2ff; background: rgba(0, 20, 40, 0.7);
+            padding: 15px; border-radius: 10px; border: 1px solid #00f2ff;
+            pointer-events: none; text-shadow: 0 0 5px #00f2ff;
+        }
         #loader {
             position: absolute; width: 100%; height: 100%;
-            background: #001122; display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; color: #00f2ff; z-index: 100;
+            background: #00050a; display: flex; justify-content: center;
+            align-items: center; color: #00f2ff; z-index: 100;
         }
     </style>
 </head>
 <body>
 
-    <div id="loader"><h1 id="status">Anpassar kameran...</h1></div>
+    <div id="loader"><h1>Skapar världen...</h1></div>
+    <div id="ui">
+        <b>MISSION: UTFORSKA</b><br>
+        W / S - Gå framåt/bakåt<br>
+        A / D - Sväng karaktären
+    </div>
     
     <script type="importmap">
         {
@@ -30,31 +41,65 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // --- 1. SCEN ---
+        // --- 1. SCEN & ATMOSFÄR ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x4488ff);
-        
+        const skyColor = 0x4488ff;
+        scene.background = new THREE.Color(skyColor);
+        scene.fog = new THREE.Fog(skyColor, 10, 140);
+
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. LJUS ---
-        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        // --- 2. LJUS (Avatar-stil) ---
+        scene.add(new THREE.AmbientLight(0x4488ff, 0.5)); // Blått fyllnadsljus
+        
         const sun = new THREE.DirectionalLight(0xffffff, 1.2);
-        sun.position.set(10, 50, 10);
+        sun.position.set(50, 100, 50);
         sun.castShadow = true;
         scene.add(sun);
 
-        // --- 3. MARKEN ---
+        // Hemisfärljus för att marken ska reflektera lite grönt på rustningen
+        const hemiLight = new THREE.HemisphereLight(0x4488ff, 0x051a05, 0.8);
+        scene.add(hemiLight);
+
+        // --- 3. MILJÖ (DEN MAGISKA SKOGEN) ---
         const ground = new THREE.Mesh(
-            new THREE.PlaneGeometry(1000, 1000),
-            new THREE.MeshStandardMaterial({ color: 0x113311 })
+            new THREE.CircleGeometry(200, 32),
+            new THREE.MeshStandardMaterial({ color: 0x051a05 })
         );
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
+
+        // Skapa träd med självlysande kronor
+        for(let i = 0; i < 150; i++) {
+            const tree = new THREE.Group();
+            
+            // Stam
+            const trunk = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.1, 0.3, 5), 
+                new THREE.MeshStandardMaterial({color: 0x1a0f00})
+            );
+            
+            // Krona (Självlysande blad)
+            const leaves = new THREE.Mesh(
+                new THREE.IcosahedronGeometry(Math.random() * 2 + 1), 
+                new THREE.MeshStandardMaterial({
+                    color: 0x00ff88, 
+                    emissive: 0x004422, // Självlysande effekt
+                    transparent: true,
+                    opacity: 0.9
+                })
+            );
+            leaves.position.y = 3;
+            
+            tree.add(trunk, leaves);
+            tree.position.set(Math.random()*180-90, 2.5, Math.random()*180-90);
+            scene.add(tree);
+        }
 
         // --- 4. KARAKTÄR ---
         const playerGroup = new THREE.Group();
@@ -64,26 +109,20 @@
         loader.load('gifts_of_akatosh_armor.glb', (gltf) => {
             const model = gltf.scene;
             
-            // AUTOMATISK SKALNING & CENTRERING
+            // Auto-skalning för att garantera att den syns
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
-            const center = box.getCenter(new THREE.Vector3());
-
             const maxDim = Math.max(size.x, size.y, size.z);
-            const scale = 4 / maxDim; // Gör den ca 4 enheter hög
+            const scale = 4 / maxDim; 
             model.scale.set(scale, scale, scale);
             
-            // VIKTIGT: Flytta modellen så att fötterna hamnar exakt på marken (y=0)
+            // Fötterna på marken och ansiktet bort från kameran
             model.position.y = -box.min.y * scale; 
-            
-            // Vrid modellen så ryggen är mot kameran
             model.rotation.y = Math.PI; 
 
+            model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
             playerGroup.add(model);
             document.getElementById('loader').style.display = 'none';
-        }, undefined, (err) => {
-            console.error(err);
-            document.getElementById('loader').innerHTML = "<h1>Kunde inte ladda GLB-filen!</h1>";
         });
 
         // --- 5. STYRNING ---
@@ -91,7 +130,7 @@
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // --- 6. ANIMATION ---
+        // --- 6. ANIMATION & KAMERA ---
         function animate() {
             requestAnimationFrame(animate);
 
@@ -103,14 +142,12 @@
             if (keys['KeyA']) playerGroup.rotation.y += rotSpeed;
             if (keys['KeyD']) playerGroup.rotation.y -= rotSpeed;
 
-            // KAMERA-INSTÄLLNING (Tredjeperson)
-            // Vi sätter kameran 6 enheter UPP (y) och 15 enheter BAKÅT (z)
-            const relativeOffset = new THREE.Vector3(0, 6, -15);
+            // Tredjeperson-kamera med fjädrande följning
+            const relativeOffset = new THREE.Vector3(0, 7, -18);
             const cameraOffset = relativeOffset.applyMatrix4(playerGroup.matrixWorld);
 
-            camera.position.lerp(cameraOffset, 0.1); // Mjuk följning
+            camera.position.lerp(cameraOffset, 0.1); 
 
-            // Titta på en punkt mitt på karaktären (y + 3)
             const lookAtTarget = new THREE.Vector3(
                 playerGroup.position.x,
                 playerGroup.position.y + 3,
