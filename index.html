@@ -3,40 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar 3D - Forest Explorer</title>
+    <title>Avatar 3D - Forest Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #4488ff; font-family: sans-serif; }
-        #instructions {
-            position: absolute; top: 20px; left: 20px;
-            color: white; background: rgba(0, 30, 60, 0.7);
-            padding: 15px; border-radius: 10px; border: 1px solid #00f2ff;
-            pointer-events: none;
-        }
         #loader {
             position: absolute; width: 100%; height: 100%;
             background: #001122; display: flex; flex-direction: column; 
             justify-content: center; align-items: center; color: #00f2ff; z-index: 100;
         }
-        .spinner {
-            width: 50px; height: 50px; border: 5px solid rgba(0,242,255,0.2);
-            border-top: 5px solid #00f2ff; border-radius: 50%;
-            animation: spin 1s linear infinite; margin-bottom: 20px;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-    <div id="loader">
-        <div class="spinner"></div>
-        <h1 id="status">Laddar din Avatar...</h1>
-    </div>
-
-    <div id="instructions">
-        <b>KONTROLLER:</b><br>
-        W / S - Gå framåt/bakåt<br>
-        A / D - Sväng karaktären
-    </div>
+    <div id="loader"><h1 id="status">Laddar rustning...</h1></div>
     
     <script type="importmap">
         {
@@ -51,85 +30,59 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // --- 1. SCEN OCH ATMOSFÄR ---
+        // --- 1. SCEN ---
         const scene = new THREE.Scene();
-        const skyColor = 0x4488ff; // Den blå himlen du bad om
+        const skyColor = 0x4488ff;
         scene.background = new THREE.Color(skyColor);
-        scene.fog = new THREE.Fog(skyColor, 10, 150); // Dimman smälter ihop med himlen
-
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Vi tar bort dimman (fog) tillfälligt så vi ser allt tydligt
+        
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setPixelRatio(window.devicePixelRatio);
-        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- 2. LJUSSÄTTNING ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-        scene.add(ambientLight);
+        // --- 2. LJUS ---
+        scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(10, 20, 10);
+        scene.add(sun);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
-        sunLight.position.set(50, 100, 50);
-        sunLight.castShadow = true;
-        scene.add(sunLight);
-
-        // --- 3. MILJÖ (MARKEN & SKOGEN) ---
+        // --- 3. MARKEN ---
         const ground = new THREE.Mesh(
-            new THREE.CircleGeometry(200, 32),
-            new THREE.MeshStandardMaterial({ color: 0x112211 })
+            new THREE.PlaneGeometry(1000, 1000),
+            new THREE.MeshStandardMaterial({ color: 0x113311 })
         );
         ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
         scene.add(ground);
 
-        // Slumpa ut träd
-        for(let i = 0; i < 100; i++) {
-            const tree = new THREE.Group();
-            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.4, 4), new THREE.MeshStandardMaterial({color: 0x221100}));
-            const leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(2), new THREE.MeshStandardMaterial({color: 0x00aa44}));
-            leaves.position.y = 3;
-            tree.add(trunk, leaves);
-            tree.position.set(Math.random()*180-90, 2, Math.random()*180-90);
-            scene.add(tree);
-        }
-
-        // --- 4. KARAKTÄR OCH KAMERA-LOGIK ---
+        // --- 4. KARAKTÄR ---
         const playerGroup = new THREE.Group();
         scene.add(playerGroup);
 
-        // Denna punkt svävar bakom spelaren - dit kameran vill nå
-        const cameraTarget = new THREE.Object3D();
-        cameraTarget.position.set(0, 6, 12); // (Höjd: 6, Avstånd bakåt: 12)
-        playerGroup.add(cameraTarget);
-
         const loader = new GLTFLoader();
-        // VIKTIGT: Filnamnet måste matcha din fil på GitHub exakt!
-        const modelUrl = 'gifts_of_akatosh_armor.glb'; 
-
-        loader.load(modelUrl, (gltf) => {
+        loader.load('gifts_of_akatosh_armor.glb', (gltf) => {
             const model = gltf.scene;
             
-            // Justera storlek
-            model.scale.set(0.5, 0.5, 0.5); 
+            // AUTOMATISK SKALNING (Viktigt!)
+            const box = new THREE.Box3().setFromObject(model);
+            const size = box.getSize(new THREE.Vector3());
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const scale = 3 / maxDim; // Gör modellen 3 enheter hög
+            model.scale.set(scale, scale, scale);
             
-            // ROTATION: Vänder modellen 180 grader så den tittar bort från kameran
+            // Centrera modellen
+            model.position.y = 0;
             model.rotation.y = Math.PI; 
 
-            model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
             playerGroup.add(model);
-            
             document.getElementById('loader').style.display = 'none';
-        }, 
-        (xhr) => {
-            const percent = Math.round((xhr.loaded / xhr.total) * 100);
-            if (percent) document.getElementById('status').innerText = `Laddar: ${percent}%`;
-        },
-        (error) => {
-            console.error("Fel vid laddning:", error);
-            // Reserv om GLB inte hittas
-            const fallback = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
-            fallback.position.y = 1;
-            playerGroup.add(fallback);
+            console.log("Modell laddad och skalad!");
+        }, undefined, (err) => {
+            console.error(err);
+            // Om GLB dör, visa en röd box så du ser om koden i övrigt funkar
+            const box = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0xff0000}));
+            box.position.y = 1;
+            playerGroup.add(box);
             document.getElementById('loader').style.display = 'none';
         });
 
@@ -138,40 +91,29 @@
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // --- 6. ANIMATIONSLOOP ---
+        // --- 6. ANIMATION ---
         function animate() {
             requestAnimationFrame(animate);
 
-            const moveSpeed = 0.2;
-            const rotSpeed = 0.05;
+            if (keys['KeyW']) playerGroup.translateZ(0.2);
+            if (keys['KeyS']) playerGroup.translateZ(-0.2);
+            if (keys['KeyA']) playerGroup.rotation.y += 0.05;
+            if (keys['KeyD']) playerGroup.rotation.y -= 0.05;
 
-            // Rörelse (W går framåt i lokal riktning)
-            if (keys['KeyW']) playerGroup.translateZ(moveSpeed); 
-            if (keys['KeyS']) playerGroup.translateZ(-moveSpeed); 
-            if (keys['KeyA']) playerGroup.rotation.y += rotSpeed; 
-            if (keys['KeyD']) playerGroup.rotation.y -= rotSpeed; 
+            // KAMERA SOM ALLTID HÅLLER AVSTÅND
+            // Vi placerar kameran 10 enheter bakom och 5 enheter upp relativt till spelaren
+            const relativeOffset = new THREE.Vector3(0, 5, -12);
+            const cameraOffset = relativeOffset.applyMatrix4(playerGroup.matrixWorld);
 
-            // Uppdatera kamerans position mjukt
-            const targetPos = new THREE.Vector3();
-            cameraTarget.getWorldPosition(targetPos);
+            camera.position.x = cameraOffset.x;
+            camera.position.y = cameraOffset.y;
+            camera.position.z = cameraOffset.z;
 
-            // Lerp (0.08) ger en följsam, mjuk känsla när kameran "jagar" efter spelaren
-            camera.position.lerp(targetPos, 0.08);
-
-            // Kameran tittar alltid på en punkt lite ovanför spelarens position
-            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 3, playerGroup.position.z);
+            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 2, playerGroup.position.z);
 
             renderer.render(scene, camera);
         }
-
         animate();
-
-        // Hantera fönsterstorlek
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
     </script>
 </body>
 </html>
