@@ -2,7 +2,8 @@
 <html lang="sv">
 <head>
     <meta charset="UTF-8">
-    <title>Avatar 3D - Animated Adventure</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar 3D - Rotation Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #4488ff; font-family: sans-serif; }
         #ui { position: absolute; top: 20px; left: 20px; color: #00f2ff; background: rgba(0, 20, 40, 0.7); padding: 15px; border-radius: 10px; border: 1px solid #00f2ff; pointer-events: none; }
@@ -11,8 +12,8 @@
 </head>
 <body>
 
-    <div id="loader"><h1>Laddar animationer...</h1></div>
-    <div id="ui"><b>KONTROLLER:</b><br>W / S - Gå & Animera<br>A / D - Sväng</div>
+    <div id="loader"><h1>Vänder på rustningen...</h1></div>
+    <div id="ui"><b>KONTROLLER:</b><br>W / S - Gå fram/bak<br>A / D - Sväng</div>
     
     <script type="importmap">
         {
@@ -27,10 +28,9 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // --- SCEN & KLOCKA ---
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x4488ff);
-        const clock = new THREE.Clock(); // Behövs för animationer
+        scene.fog = new THREE.Fog(0x4488ff, 10, 150);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -41,106 +41,90 @@
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const sun = new THREE.DirectionalLight(0xffffff, 1.2);
         sun.position.set(50, 100, 50);
+        sun.castShadow = true;
         scene.add(sun);
 
-        // Mark
+        // Mark och Träd
         const ground = new THREE.Mesh(new THREE.CircleGeometry(300, 32), new THREE.MeshStandardMaterial({ color: 0x051a05 }));
         ground.rotation.x = -Math.PI / 2;
+        ground.receiveShadow = true;
         scene.add(ground);
 
-        // --- KARAKTÄR & ANIMATION VARIABLER ---
+        for(let i = 0; i < 100; i++) {
+            const tree = new THREE.Group();
+            const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 5), new THREE.MeshStandardMaterial({color: 0x1a0f00}));
+            const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(2), new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x002211}));
+            leaves.position.y = 3;
+            tree.add(trunk, leaves);
+            tree.position.set(Math.random()*200-100, 2.5, Math.random()*200-100);
+            scene.add(tree);
+        }
+
+        // --- KARAKTÄR ---
         const playerGroup = new THREE.Group();
         scene.add(playerGroup);
 
-        let mixer; // AnimationMixer
-        let actions = {}; // Håller våra animationer (Idle, Walk, etc)
-        let activeAction;
         let modelLoaded = false;
-
         const loader = new GLTFLoader();
+        
         loader.load('gifts_of_akatosh_armor.glb', (gltf) => {
             const model = gltf.scene;
             
-            // Skalning
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
             const scale = 5 / size.y; 
             model.scale.set(scale, scale, scale);
+            
+            // Justera höjd så fötterna nuddar marken
             model.position.y = -box.min.y * scale; 
 
-            // Rotation-fix container
+            // --- HÄR FIXAR VI ROTATIONEN ---
+            // Vi skapar en extra container för modellen för att tvinga rotationen
             const modelContainer = new THREE.Group();
             modelContainer.add(model);
-            modelContainer.rotation.y = Math.PI; 
-            playerGroup.add(modelContainer);
-
-            // --- ANIMATIONS-LOGIK ---
-            mixer = new THREE.AnimationMixer(model);
             
-            // Logga alla animationer i konsolen så du ser vad de heter!
-            console.log("Animationer hittade:", gltf.animations.map(a => a.name));
-
-            gltf.animations.forEach((clip) => {
-                const action = mixer.clipAction(clip);
-                actions[clip.name] = action;
-            });
-
-            // Starta med den första animationen (ofta "Idle")
-            if (gltf.animations.length > 0) {
-                activeAction = actions[gltf.animations[0].name];
-                activeAction.play();
-            }
-
+            // Testa att ändra denna till 0 eller Math.PI beroende på hur den ser ut
+            modelContainer.rotation.y = Math.PI; 
+            
+            playerGroup.add(modelContainer);
             modelLoaded = true;
             document.getElementById('loader').style.display = 'none';
         });
 
-        // Styrning
         const keys = {};
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // Funktion för att byta animation mjukt
-        function fadeToAction(name, duration = 0.2) {
-            if (!actions[name] || activeAction === actions[name]) return;
-            const previousAction = activeAction;
-            activeAction = actions[name];
-            if (previousAction) previousAction.fadeOut(duration);
-            activeAction.reset().setEffectiveTimeScale(1).setEffectiveWeight(1).fadeIn(duration).play();
-        }
-
         function animate() {
             requestAnimationFrame(animate);
-            const dt = clock.getDelta(); // Tid sedan förra framen
 
             if (modelLoaded) {
-                if (mixer) mixer.update(dt); // Uppdatera animationen!
-
                 const moveSpeed = 0.3;
                 const rotSpeed = 0.05;
 
-                // Enkel logik: Om vi går, byt till animation nr 2 (ofta Walk)
-                // OBS: Du kan behöva ändra namnen "Walk" eller "Run" nedan!
-                if (keys['KeyW'] || keys['KeyS']) {
-                    playerGroup.translateZ(keys['KeyW'] ? moveSpeed : -moveSpeed);
-                    // fadeToAction('Walk'); // Avkommentera och byt till rätt namn från konsolen
-                } else {
-                    // fadeToAction('Idle'); // Avkommentera och byt till rätt namn från konsolen
-                }
-
+                // Om du nu går åt fel håll, ändra tecken (+/-) på moveSpeed här:
+                if (keys['KeyW']) playerGroup.translateZ(moveSpeed); 
+                if (keys['KeyS']) playerGroup.translateZ(-moveSpeed);
                 if (keys['KeyA']) playerGroup.rotation.y += rotSpeed;
                 if (keys['KeyD']) playerGroup.rotation.y -= rotSpeed;
             }
 
-            // Kamera
-            const relativeOffset = new THREE.Vector3(0, 8, -20);
+            // KAMERA
+            const relativeOffset = new THREE.Vector3(0, 8, -20); // Placerad BAKOM (negativt Z)
             const cameraOffset = relativeOffset.applyMatrix4(playerGroup.matrixWorld);
+
             camera.position.lerp(cameraOffset, 0.1);
             camera.lookAt(playerGroup.position.x, playerGroup.position.y + 3, playerGroup.position.z);
 
             renderer.render(scene, camera);
         }
         animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
