@@ -3,30 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar: Akatosh Final Fix</title>
+    <title>Avatar 3D - Rotation Fix</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #4488ff; font-family: sans-serif; }
-        #ui {
-            position: absolute; top: 20px; left: 20px;
-            color: #00f2ff; background: rgba(0, 20, 40, 0.7);
-            padding: 15px; border-radius: 10px; border: 1px solid #00f2ff;
-            pointer-events: none;
-        }
-        #loader {
-            position: absolute; width: 100%; height: 100%;
-            background: #00050a; display: flex; justify-content: center;
-            align-items: center; color: #00f2ff; z-index: 100;
-        }
+        #ui { position: absolute; top: 20px; left: 20px; color: #00f2ff; background: rgba(0, 20, 40, 0.7); padding: 15px; border-radius: 10px; border: 1px solid #00f2ff; pointer-events: none; }
+        #loader { position: absolute; width: 100%; height: 100%; background: #00050a; display: flex; justify-content: center; align-items: center; color: #00f2ff; z-index: 100; }
     </style>
 </head>
 <body>
 
-    <div id="loader"><h1>Aktiverar rörelsesystem...</h1></div>
-    <div id="ui">
-        <b>KONTROLLER:</b><br>
-        W / S - Gå fram/bak<br>
-        A / D - Sväng karaktären
-    </div>
+    <div id="loader"><h1>Vänder på rustningen...</h1></div>
+    <div id="ui"><b>KONTROLLER:</b><br>W / S - Gå fram/bak<br>A / D - Sväng</div>
     
     <script type="importmap">
         {
@@ -41,11 +28,9 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-        // --- SCEN ---
         const scene = new THREE.Scene();
-        const skyColor = 0x4488ff;
-        scene.background = new THREE.Color(skyColor);
-        scene.fog = new THREE.Fog(skyColor, 5, 150);
+        scene.background = new THREE.Color(0x4488ff);
+        scene.fog = new THREE.Fog(0x4488ff, 10, 150);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -53,30 +38,25 @@
         renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        // --- LJUS ---
-        scene.add(new THREE.AmbientLight(0x4488ff, 0.6));
-        const sun = new THREE.DirectionalLight(0xffffff, 1.5);
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const sun = new THREE.DirectionalLight(0xffffff, 1.2);
         sun.position.set(50, 100, 50);
         sun.castShadow = true;
         scene.add(sun);
 
-        // --- VÄRLD ---
-        const ground = new THREE.Mesh(
-            new THREE.CircleGeometry(300, 32),
-            new THREE.MeshStandardMaterial({ color: 0x051a05 })
-        );
+        // Mark och Träd
+        const ground = new THREE.Mesh(new THREE.CircleGeometry(300, 32), new THREE.MeshStandardMaterial({ color: 0x051a05 }));
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Träd
-        for(let i = 0; i < 150; i++) {
+        for(let i = 0; i < 100; i++) {
             const tree = new THREE.Group();
             const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.3, 5), new THREE.MeshStandardMaterial({color: 0x1a0f00}));
-            const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(Math.random() * 2 + 1), new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x004422}));
+            const leaves = new THREE.Mesh(new THREE.IcosahedronGeometry(2), new THREE.MeshStandardMaterial({color: 0x00ff88, emissive: 0x002211}));
             leaves.position.y = 3;
             tree.add(trunk, leaves);
-            tree.position.set(Math.random()*250-125, 2.5, Math.random()*250-125);
+            tree.position.set(Math.random()*200-100, 2.5, Math.random()*200-100);
             scene.add(tree);
         }
 
@@ -92,50 +72,45 @@
             
             const box = new THREE.Box3().setFromObject(model);
             const size = box.getSize(new THREE.Vector3());
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const scale = 5 / maxDim; 
+            const scale = 5 / size.y; 
             model.scale.set(scale, scale, scale);
             
+            // Justera höjd så fötterna nuddar marken
             model.position.y = -box.min.y * scale; 
 
-            // PROVA DENNA ROTATION: 
-            // Om den fortfarande ser fel ut, ändra 0 till Math.PI eller tvärtom
-            model.rotation.y = Math.PI; 
-
-            model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-            playerGroup.add(model);
+            // --- HÄR FIXAR VI ROTATIONEN ---
+            // Vi skapar en extra container för modellen för att tvinga rotationen
+            const modelContainer = new THREE.Group();
+            modelContainer.add(model);
             
+            // Testa att ändra denna till 0 eller Math.PI beroende på hur den ser ut
+            modelContainer.rotation.y = Math.PI; 
+            
+            playerGroup.add(modelContainer);
             modelLoaded = true;
             document.getElementById('loader').style.display = 'none';
         });
 
-        // --- STYRNING ---
         const keys = {};
-        window.addEventListener('keydown', (e) => { 
-            keys[e.code] = true;
-            // Förhindrar att sidan scrollar när du trycker på pilarna/WASD
-            if(["Space","ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(e.code) > -1) e.preventDefault();
-        });
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // --- ANIMATION ---
         function animate() {
             requestAnimationFrame(animate);
 
             if (modelLoaded) {
-                const moveSpeed = 0.3; // Ökad hastighet
+                const moveSpeed = 0.3;
                 const rotSpeed = 0.05;
 
-                // VIKTIGT: Vi använder translateZ(-moveSpeed) för att W ska gå framåt
-                if (keys['KeyW']) playerGroup.translateZ(-moveSpeed);
-                if (keys['KeyS']) playerGroup.translateZ(moveSpeed);
+                // Om du nu går åt fel håll, ändra tecken (+/-) på moveSpeed här:
+                if (keys['KeyW']) playerGroup.translateZ(moveSpeed); 
+                if (keys['KeyS']) playerGroup.translateZ(-moveSpeed);
                 if (keys['KeyA']) playerGroup.rotation.y += rotSpeed;
                 if (keys['KeyD']) playerGroup.rotation.y -= rotSpeed;
             }
 
-            // KAMERA-UPPDATERING
-            // Sätter kameran högre upp (8) och längre bak (15)
-            const relativeOffset = new THREE.Vector3(0, 8, 15);
+            // KAMERA
+            const relativeOffset = new THREE.Vector3(0, 8, -20); // Placerad BAKOM (negativt Z)
             const cameraOffset = relativeOffset.applyMatrix4(playerGroup.matrixWorld);
 
             camera.position.lerp(cameraOffset, 0.1);
