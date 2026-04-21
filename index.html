@@ -3,26 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Avatar: Akatosh Armor Adventure</title>
+    <title>Avatar: Akatosh Adventure</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #4488ff; font-family: sans-serif; }
+        
         #ui {
             position: absolute;
             top: 20px;
             left: 20px;
-            color: #00f2ff;
-            background: rgba(0, 20, 40, 0.7);
+            color: white;
+            background: rgba(0, 40, 80, 0.6);
             padding: 15px;
-            border: 1px solid #00f2ff;
-            border-radius: 8px;
+            border-radius: 10px;
             pointer-events: none;
-            text-shadow: 0 0 5px #00f2ff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
         }
+
         #loading-screen {
             position: absolute;
             width: 100%;
             height: 100%;
-            background: #00050a;
+            background: #001122;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -30,29 +31,31 @@
             color: #00f2ff;
             z-index: 10;
         }
-        .spinner {
-            width: 50px;
-            height: 50px;
-            border: 5px solid rgba(0, 242, 255, 0.2);
-            border-top: 5px solid #00f2ff;
+
+        .loader {
+            border: 8px solid #002244;
+            border-top: 8px solid #00f2ff;
             border-radius: 50%;
+            width: 60px;
+            height: 60px;
             animation: spin 1s linear infinite;
             margin-bottom: 20px;
         }
+
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
     <div id="loading-screen">
-        <div class="spinner"></div>
-        <div id="status">Laddar rustningen från GitHub...</div>
+        <div class="loader"></div>
+        <div id="status">Ansluter till Pandora...</div>
     </div>
 
     <div id="ui">
-        <b>MISSION: UTFORSKA SKOGEN</b><br>
+        <b>KONTROLLER</b><br>
         W / S - Gå framåt & bakåt<br>
-        A / D - Sväng karaktären
+        A / D - Sväng vänster & höger
     </div>
     
     <script type="importmap">
@@ -68,78 +71,79 @@
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-   // --- 1. SCEN & RENDERER ---
-const scene = new THREE.Scene();
-const skyColor = 0x4488ff; // En klarare blå
-scene.background = new THREE.Color(skyColor);
-scene.fog = new THREE.Fog(skyColor, 10, 150); // Linjär dimma för bättre sikt
+        // --- 1. GRUNDLÄGGANDE INSTÄLLNINGAR ---
+        const scene = new THREE.Scene();
+        
+        // HIMMEL OCH DIMMA
+        const skyColor = 0x4488ff; // Klarblå himmelsfärg
+        scene.background = new THREE.Color(skyColor);
+        scene.fog = new THREE.Fog(skyColor, 10, 100); // Dimma som matchar himlen för horisonten
 
-// --- 2. BELYSNING ---
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.4); 
-scene.add(ambientLight);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+        document.body.appendChild(renderer.domElement);
 
-const hemiLight = new THREE.HemisphereLight(skyColor, 0x081108, 0.8);
-scene.add(hemiLight);
+        // --- 2. LJUS ---
+        // Omgivningsljus (blåaktigt för att matcha himlen)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5); 
+        scene.add(ambientLight);
 
-const moonLight = new THREE.DirectionalLight(0xffffff, 1.5);
-moonLight.position.set(50, 100, 50);
-moonLight.castShadow = true;
-scene.add(moonLight);
+        // Hemisfärljus ger naturliga skuggor (blått uppifrån, mörkt nerifrån)
+        const hemiLight = new THREE.HemisphereLight(skyColor, 0x081108, 0.8);
+        scene.add(hemiLight);
 
-        // --- 3. MILJÖ (MARKEN & TRÄD) ---
-        const groundGeo = new THREE.CircleGeometry(100, 32);
-        const groundMat = new THREE.MeshStandardMaterial({ color: 0x0a140a });
+        // "Solljus" som skapar skuggor
+        const sunLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        sunLight.position.set(50, 100, 50);
+        sunLight.castShadow = true;
+        // Förbättra skuggupplösning
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        scene.add(sunLight);
+
+        // --- 3. MILJÖ ---
+        // Mark (Mörkt gräs/jord)
+        const groundGeo = new THREE.CircleGeometry(200, 32);
+        const groundMat = new THREE.MeshStandardMaterial({ color: 0x112211 });
         const ground = new THREE.Mesh(groundGeo, groundMat);
         ground.rotation.x = -Math.PI / 2;
         ground.receiveShadow = true;
         scene.add(ground);
 
-        // Skapa en enkel skog
-        const treeCount = 150;
-        for(let i = 0; i < treeCount; i++) {
+        // Skapa en skog av träd
+        for(let i = 0; i < 120; i++) {
             const tree = new THREE.Group();
-            
-            // Stam
             const trunk = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.1, 0.3, 4), 
-                new THREE.MeshStandardMaterial({color: 0x1a0d00})
+                new THREE.CylinderGeometry(0.2, 0.4, 4), 
+                new THREE.MeshStandardMaterial({color: 0x221100})
             );
-            
-            // Krona (Självlysande blad för Avatar-känsla)
             const leaves = new THREE.Mesh(
-                new THREE.IcosahedronGeometry(Math.random() * 2 + 1), 
-                new THREE.MeshStandardMaterial({
-                    color: 0x00ffaa, 
-                    emissive: 0x002211,
-                    transparent: true,
-                    opacity: 0.8
-                })
+                new THREE.DodecahedronGeometry(2), 
+                new THREE.MeshStandardMaterial({color: 0x00aa44})
             );
             leaves.position.y = 3;
-            
             tree.add(trunk, leaves);
-            tree.position.set(
-                Math.random() * 160 - 80, 
-                2, 
-                Math.random() * 160 - 80
-            );
+            tree.position.set(Math.random()*180-90, 2, Math.random()*180-90);
             scene.add(tree);
         }
 
-        // --- 4. KARAKTÄR (DIN GLB-FIL) ---
+        // --- 4. LADDA DIN AVATAR (GLB) ---
         let player = new THREE.Group(); 
         scene.add(player);
 
         const loader = new GLTFLoader();
-        // Justera filnamnet här om det behövs
+        // Filnamnet måste stämma exakt med GitHub
         const modelUrl = 'gifts_of_akatosh_armor.glb'; 
 
         loader.load(modelUrl, (gltf) => {
             const model = gltf.scene;
             
-            // JUSTERING: Om du såg "inifrån" modellen kan vi skala ner den och flytta ner den
+            // Justera storlek och position
             model.scale.set(1.5, 1.5, 1.5); 
-            model.position.y = 0; // Se till att fötterna är på marken
+            model.position.y = 0; 
             
             model.traverse(child => {
                 if (child.isMesh) {
@@ -152,53 +156,55 @@ scene.add(moonLight);
             document.getElementById('loading-screen').style.display = 'none';
         }, 
         (xhr) => {
-            const percent = Math.round((xhr.loaded / xhr.total) * 100);
-            document.getElementById('status').innerText = `Laddar rustningen: ${percent}%`;
+            if (xhr.lengthComputable) {
+                const percent = Math.round((xhr.loaded / xhr.total) * 100);
+                document.getElementById('status').innerText = `Laddar rustning: ${percent}%`;
+            }
         },
         (error) => {
-            console.error(error);
-            document.getElementById('status').innerText = "Kunde inte ladda GLB-filen. Kontrollera filnamnet!";
+            console.error("Fel vid laddning:", error);
+            document.getElementById('status').innerText = "Kunde inte hitta GLB-filen!";
         });
 
-        // --- 5. RÖRELSE-LOGIK ---
+        // --- 5. RÖRELSE OCH KAMERA ---
         const keys = {};
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        function updatePlayer() {
-            const moveSpeed = 0.15;
+        function update() {
+            const moveSpeed = 0.2;
             const rotateSpeed = 0.04;
 
+            // Karaktärsrörelse
             if (keys['KeyW']) player.translateZ(-moveSpeed);
             if (keys['KeyS']) player.translateZ(moveSpeed);
             if (keys['KeyA']) player.rotation.y += rotateSpeed;
             if (keys['KeyD']) player.rotation.y -= rotateSpeed;
 
-            // TREDJEPERSONS-KAMERA (Följer bakom)
-            // Vi skapar en position 8 enheter bakom och 4 enheter uppåt från spelaren
-            const cameraOffset = new THREE.Vector3(0, 4, 8); 
-            const actualOffset = cameraOffset.applyMatrix4(player.matrixWorld);
+            // TREDJEPERSONSKAMERA (Följer bakom och tittar på ryggen)
+            const relativeCameraOffset = new THREE.Vector3(0, 5, 10); 
+            const cameraOffset = relativeCameraOffset.applyMatrix4(player.matrixWorld);
 
-            camera.position.lerp(actualOffset, 0.1); // "lerp" gör kamerarörelsen mjuk
+            // Mjuk kamera-förflyttning (Lerp)
+            camera.position.lerp(cameraOffset, 0.1);
             camera.lookAt(player.position.x, player.position.y + 2, player.position.z);
         }
 
-        // --- 6. ANIMATIONSLOOP ---
+        // --- 6. ANIMATION ---
         function animate() {
             requestAnimationFrame(animate);
-            updatePlayer();
+            update();
             renderer.render(scene, camera);
         }
 
         animate();
 
-        // Hantera fönsterstorlek
+        // Hantera storleksändring av fönster
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
-
     </script>
 </body>
 </html>
