@@ -97,10 +97,8 @@
             const model = gltf.scene;
             
             // Prova skala 1.0 först, om den är för stor/liten, ändra här
-            model.scale.set(1.5, 1.5, 1.5); 
+            model.scale.set(0.5, 0.5, 0.5); 
             
-            // Rotera modellen 180 grader om den tittar på kameran istället för bort
-            model.rotation.y = Math.PI; 
 
             model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
             playerGroup.add(model);
