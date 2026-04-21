@@ -88,7 +88,7 @@
         const loader = new GLTFLoader();
         
         // ERSÄTT 'gifts_of_akatosh_armor.glb' med den faktiska sökvägen om den ändras
-        loader.load(https://drive.google.com/file/d/1DTTrWLVmZLK9ijCfrkstW2-xNhnXBcOv/view?usp=sharing, function(gltf) {
+        loader.load(gifts_of_akatosh_armor.glb, function(gltf) {
             const model = gltf.scene;
             model.scale.set(1, 1, 1); // Justera storleken om den är för liten/stor
             model.traverse(n => { if (n.isMesh) n.castShadow = true; });
