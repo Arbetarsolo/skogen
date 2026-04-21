@@ -82,75 +82,67 @@
             scene.add(tree);
         }
 
-        // --- 4. KARAKTÄR OCH KAMERA-CONTAINER ---
-        // Vi skapar en playerGroup som håller både modellen och kamerans målpunkt
-        const playerGroup = new THREE.Group();
-        scene.add(playerGroup);
+       // --- 4. KARAKTÄR OCH KAMERA-CONTAINER ---
+const playerGroup = new THREE.Group();
+scene.add(playerGroup);
 
-        // En osynlig punkt som svävar 10 meter bakom och 5 meter upp
-        const cameraTarget = new THREE.Object3D();
-        cameraTarget.position.set(0, 5, 10); 
-        playerGroup.add(cameraTarget);
+// Justera dessa siffror för att ändra kamerans vinkel:
+// (0, 6, 12) betyder: 0 i sidled, 6 meter upp, 12 meter bakom
+const cameraTarget = new THREE.Object3D();
+cameraTarget.position.set(0, 6, 12); 
+playerGroup.add(cameraTarget);
 
-        const loader = new GLTFLoader();
-        loader.load('gifts_of_akatosh_armor.glb', (gltf) => {
-            const model = gltf.scene;
-            
-            // Prova skala 1.0 först, om den är för stor/liten, ändra här
-            model.scale.set(0.5, 0.5, 0.5); 
-            
+const loader = new GLTFLoader();
+loader.load('gifts_of_akatosh_armor.glb', (gltf) => {
+    const model = gltf.scene;
+    
+    // Om modellen var för stor/liten, justera här:
+    model.scale.set(0.5, 0.5, 0.5); 
 
-            model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
-            playerGroup.add(model);
-            document.getElementById('loader').style.display = 'none';
-        }, undefined, (error) => {
-            console.error("Kunde inte ladda GLB, använder platshållare.");
-            const fallback = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
-            fallback.position.y = 1;
-            playerGroup.add(fallback);
-            document.getElementById('loader').style.display = 'none';
-        });
+    // VIKTIGT: Vänder modellen 180 grader så den går BORT från kameran
+    model.rotation.y = Math.PI; 
+
+    model.traverse(n => { if (n.isMesh) { n.castShadow = true; n.receiveShadow = true; } });
+    playerGroup.add(model);
+    document.getElementById('loader').style.display = 'none';
+}, undefined, (error) => {
+    console.error("Laddningsfel:", error);
+    const fallback = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({color: 0x00f2ff}));
+    fallback.position.y = 1;
+    playerGroup.add(fallback);
+    document.getElementById('loader').style.display = 'none';
+});
 
         // --- 5. KONTROLLER ---
         const keys = {};
         window.addEventListener('keydown', (e) => keys[e.code] = true);
         window.addEventListener('keyup', (e) => keys[e.code] = false);
 
-        // --- 6. ANIMATIONSLOOP ---
-        function animate() {
-            requestAnimationFrame(animate);
+       // --- 6. ANIMATIONSLOOP ---
+function animate() {
+    requestAnimationFrame(animate);
 
-            const moveSpeed = 0.2;
-            const rotSpeed = 0.05;
+    const moveSpeed = 0.2;
+    const rotSpeed = 0.05;
 
-            // Rörelse
-            if (keys['KeyW']) playerGroup.translateZ(moveSpeed); // Gå framåt
-            if (keys['KeyS']) playerGroup.translateZ(-moveSpeed); // Gå bakåt
-            if (keys['KeyA']) playerGroup.rotation.y += rotSpeed; // Sväng vänster
-            if (keys['KeyD']) playerGroup.rotation.y -= rotSpeed; // Sväng höger
+    // Rörelse - Justerad för att matcha rotationsändringen
+    if (keys['KeyW']) playerGroup.translateZ(moveSpeed); 
+    if (keys['KeyS']) playerGroup.translateZ(-moveSpeed); 
+    if (keys['KeyA']) playerGroup.rotation.y += rotSpeed; 
+    if (keys['KeyD']) playerGroup.rotation.y -= rotSpeed; 
 
-            // KAMERA-LOGIK:
-            // 1. Hitta målpunktens position i världen
-            const targetPos = new THREE.Vector3();
-            cameraTarget.getWorldPosition(targetPos);
+    // Mjuk kamerauppföljning
+    const targetPos = new THREE.Vector3();
+    cameraTarget.getWorldPosition(targetPos);
 
-            // 2. Flytta kameran mjukt mot målpunkten (lerp)
-            camera.position.lerp(targetPos, 0.1);
+    // 0.05 gör kameran ännu mjukare/långsammare, 0.2 gör den snabbare
+    camera.position.lerp(targetPos, 0.08);
 
-            // 3. Titta på spelaren (lite ovanför fötterna)
-            camera.lookAt(playerGroup.position.x, playerGroup.position.y + 2, playerGroup.position.z);
+    // Titta på en punkt lite ovanför spelarens position (brösthöjd)
+    camera.lookAt(playerGroup.position.x, playerGroup.position.y + 3, playerGroup.position.z);
 
-            renderer.render(scene, camera);
-        }
-
-        animate();
-
-        // Hantera fönsterstorlek
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+    renderer.render(scene, camera);
+}
     </script>
 </body>
 </html>
