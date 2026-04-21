@@ -89,7 +89,7 @@ scene.add(playerGroup);
 // Justera dessa siffror för att ändra kamerans vinkel:
 // (0, 6, 12) betyder: 0 i sidled, 6 meter upp, 12 meter bakom
 const cameraTarget = new THREE.Object3D();
-cameraTarget.position.set(0, 6, 12); 
+cameraTarget.position.set(0, 15, 30); 
 playerGroup.add(cameraTarget);
 
 const loader = new GLTFLoader();
@@ -97,7 +97,7 @@ loader.load('gifts_of_akatosh_armor.glb', (gltf) => {
     const model = gltf.scene;
     
     // Om modellen var för stor/liten, justera här:
-    model.scale.set(0.5, 0.5, 0.5); 
+    model.scale.set(0.2, 0.2, 0.2); 
 
     // VIKTIGT: Vänder modellen 180 grader så den går BORT från kameran
     model.rotation.y = Math.PI; 
